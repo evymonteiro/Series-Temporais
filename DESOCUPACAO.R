@@ -7,6 +7,7 @@
 #install.packages("forecast")
 #install.packages("ggplot2")
 #install.packages("patchwork")
+#install.packages("rstudioapi)
 
 #############
 
@@ -18,11 +19,11 @@ require(lmtest)
 require(forecast)
 require(ggplot2)
 require(patchwork)
+require(rstudioapi)
 
 
 rm(list=ls(all=TRUE))
-dados <- "D://ARQUIVOS_POS_ESTATISTICA//Series Temporais//prim_aula_pratica_2025.xlsx"
-tx_desocupacao <- read.xlsx(dados, sheet = "Taxa desocup")
+tx_desocupacao <- read.xlsx(rstudioapi::selectFile(), sheet = "Taxa deoscup")
 print(tx_desocupacao)
 
 p=4 #frequência em que os dados foram observados

@@ -16,12 +16,12 @@ require(nortest)
 require(lmtest)
 require(forecast)
 require(ggplot2)
+require(rstudioapi)
+
 
 
 rm(list=ls(all=TRUE))
-dados <- "D://ARQUIVOS_POS_ESTATISTICA//Series Temporais//prim_aula_pratica_2025.xlsx"
-vol_vendas <- read.xlsx(dados, sheet = "Vol vendas")
-tx_desocupacao <- read.xlsx(dados, sheet = "Taxa desocup")
+vol_vendas <- read.xlsx(rstudioapi::selectFile(), sheet = "Vol vendas")
 
 p_vendas=12 #frequência em que os dados foram observados
 
@@ -197,4 +197,3 @@ Acf(z)
 Pacf(z)
 hist(z)
 t(t(c(summary(z),Var=var(z),Sd=sd(z),skewness=skewness(z),kurtose=kurtosis(z))))
-
