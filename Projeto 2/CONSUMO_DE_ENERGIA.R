@@ -74,10 +74,11 @@ Box.test(residuos,lag=5,type="Ljung")
 
 dados <- read.xlsx(rstudioapi::selectFile(),"energia")
 T=nrow(dados)
+print(dados)
+y=dados[,2] #seleção de segunda coluna de energia
 
-y=dados[,2]
-p=1 #frequencia
-inicial=c(1948,1)
+p=1 #frequencia uma observação por ano.
+inicial=c(1963,1)
 y=ts(y,frequency=p,start=inicial)
 
 autoplot(y,main="Grafico de Linha")
