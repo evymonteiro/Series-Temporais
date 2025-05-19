@@ -1,0 +1,471 @@
+---
+title: "RELATÓRIO DESOCUPAÇÃO"
+author: "Évelyn Muniz"
+format: 
+  pdf:
+    fig-cap-location: bottom
+    number-sections: true
+    fig-align: center
+    toc: true
+    keep-tex: true
+header-includes:
+  - \usepackage[portuguese]{babel}
+  - \usepackage{booktabs}
+  - \usepackage{caption}
+  - \captionsetup[table]{position=top,skip=10pt,justification=centering}
+  - \usepackage{float}
+  - \floatplacement{table}{H}
+  - \usepackage{array}
+  - \setlength{\arrayrulewidth}{0.8pt}
+  - \renewcommand{\footnoterule}{}  
+editor: visual
+---
+
+```{r setup, include=FALSE}
+#| echo: FALSE
+## instalar Pacotes ##
+#install.packages("moments")
+#install.packages("openxlsx")
+#install.packages("nortest")
+#install.packages("lmtest")
+#install.packages("forecast")
+#install.packages("ggplot2")
+#install.packages("patchwork")
+#install.packages("rstudioapi")
+
+require(moments)
+require(openxlsx)
+require(nortest)
+require(lmtest)
+require(forecast)
+require(ggplot2)
+require(patchwork)
+require(rstudioapi)
+require(gridExtra)
+
+rm(list=ls(all=TRUE))
+
+```
+
+#### 1. INTRODUÇÃO E OBJETIVOS:
+
+O presente relatório visa demonstrar a análise exploratória de dados de Taxa de Desocupação do Total Brasil, no período de janeiro de 2012 ao quarto trimestre de 2022, bem como descrever as componentes da série, pelo método da decomposição.
+
+```{r load_data, error=TRUE, include=FALSE}
+tx_desocupacao <- read.xlsx(file.choose(), sheet = "Taxa desocup")
+print(tx_desocupacao)
+
+p=4 #frequência em que os dados foram observados
+inicial=c(2012,1) ##Período em que começou a observação
+N=nrow(tx_desocupacao) ##Quantidade de Observações
+
+### Selecionando as colunas de interesse: 
+Ano=tx_desocupacao[,1]
+Trimestre=tx_desocupacao[,2]
+Homens=tx_desocupacao[,3]
+Mulheres=tx_desocupacao[,4]
+Total=tx_desocupacao[,5] #Total de desocupação por trimestre
+
+Homens=ts(Homens, frequency=p, start=inicial)
+Mulheres=ts(Mulheres, frequency = p, start = inicial)
+Total=ts(Total, frequency = p, start=inicial)
+```
+
+#### 2. METODOLOGIA E RESULTADOS:
+
+##### 1. Análise Exploratória dos Dados:
+
+O banco de dados contém 5 colunas principais, a primeira é o ano, a segunda é o trimestre, a terceira é o valor da taxa por homens, a quarta é o valor da taxa por mulheres e a quinta representa a taxa total de desocupação.
+
+Inicialmente, foi plotado o gráfico separado por genêro e total. A frequência observada é igual a 4, uma vez que os dados são trimestrais e o período inicial primeiro trimestre de 2012. Abaixo, a FIGURA 1a, FIGURA 1b e FIGURA 1c, em que é possível notar um crescimento entre os anos de 2014 e 2017, em 2018 inicia um decaimento da taxa que volta a crescer no final de 2019 e entra em queda novamente no final de 2021. O comportamento foi o mesmo para homens, mulheres e a taxa total, indicando também a não-estacionariedade da série.
+
+```{r exploratory_plots, echo=FALSE}
+#| layout-ncol: 1
+#| 
+# Gráfico 1
+g1 <- autoplot(Homens) + 
+  labs(title = NULL, caption = "Figura 1a: Desocupação Masculina.", x ="Ano") +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+# Gráfico 2
+g2 <- autoplot(Mulheres) + 
+  labs(title = NULL, caption = "Figura 1b: Desocupação Feminina.", x ="Ano") +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+# Gráfico 3
+g3 <- autoplot(Total) + 
+  labs(title = NULL, caption = "Figura 1c: Desocupação Total.", x ="Ano") +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+(g1 | g2) / g3 + theme(plot.margin = margin(1, 1, 1, 1, "cm"))
+
+```
+
+A FIGURA 2 mostra os boxplots por ano, em que é possível identificar o mesmo padrão visto na FIGURA 1, entretanto, o boxplot mostra uma maior variação da taxa no ano de 2021. Nota-se que não existe alinhamento entre as medianas, indicando variação na tendência central.
+
+```{r boxplots-ano, echo=FALSE}
+par(mfrow = c(2, 2))
+
+boxplot(Total~Ano,main="Boxplot Total de Desocupação x Ano")
+boxplot(Homens~Ano,main="Boxplot Desocupação Homens x Ano")
+boxplot(Mulheres~Ano,main="Boxplot Desocupação Mulheres x Ano")
+# Título principal 
+
+mtext("Figura 2 - Boxplots por Ano", 
+      side = 3,       # 3 = cima
+      line = 1,       # Posição acima da margem
+      outer = TRUE,   # Usa margem externa
+      cex = 1      # Tamanho aumentado
+    ) 
+
+# Legenda
+mtext("Fonte: Elaboração própria.",
+      side = 1,       # 1 = baixo
+      line = 1,       # Posição abaixo da margem
+      outer = TRUE,
+      cex = 0.8)
+```
+
+A FIGURA 3 mostra os boxplots por trimestre, em que percebe-se um certo grau de alinhamento entre as medianas, indicando uma tendência central, ou seja, não existe muita variação entre os trimestres em todos os cenários analisados.
+
+```{r boxplots-trimestres, echo=FALSE}
+### Boxplot por trimestre:
+par(mfrow = c(2, 2))
+boxplot(Total~Trimestre,main="Total de Desocupação x Trimestre")
+boxplot(Homens~Trimestre,main="Desocupação Homens x Trimestre")
+boxplot(Mulheres~Trimestre,main="Desocupação Mulheres x Trimestre")
+
+mtext("Figura 3 - Boxplots por Trimestre", 
+      side = 3,       # 3 = cima
+      line = 1,       # Posição acima da margem
+      outer = TRUE,   # Usa margem externa
+      cex = 1      # Tamanho aumentado
+    ) 
+
+# Legenda
+mtext("Fonte: Elaboração própria.",
+      side = 1,       # 1 = baixo
+      line = 1,       # Posição abaixo da margem
+      outer = TRUE,
+      cex = 0.8)
+```
+
+A FIGURA 4 mostra os histogramas de densidade, é possível perceber que a taxa de desocupação total de maior densidade é a 12, também não é possível identificar normalidade nos dados.
+
+```{r histograms}
+### Histogramas:
+par(mfrow = c(2, 2))
+hist(Homens, freq = FALSE, col = "lightblue", xlab = "Homens")
+hist(Mulheres, freq = FALSE, col = "lightpink", xlab = "Mulheres")
+hist(Total, freq = FALSE, col = "lightgray", xlab = "Total")
+par(mfrow = c(1, 1))
+
+mtext("Figura 4 - Histogramas", 
+      side = 3,       # 3 = cima
+      line = 1,       # Posição acima da margem
+      outer = TRUE,   # Usa margem externa
+      cex = 1      # Tamanho aumentado
+    ) 
+
+# Legenda
+mtext("Fonte: Elaboração própria.",
+      side = 1,       # 1 = baixo
+      line = 1,       # Posição abaixo da margem
+      outer = TRUE,
+      cex = 0.8)
+```
+
+A TABELA 1 abaixo mostra as estatísticas descritivas para as variáveis analisadas, em que todas possuem assimetria negativa, o que subestima valores médios. Compreende-se também que as mulheres possuem a maior taxa de desocupação mínima, com 7,8 contra 5,1 dos homens e 8,0 do total. Os valores da média também são mais altos para mulheres (12,70) do que para os homens (8,89) e o total (10,53). O valor da curtose para todas as variáveis é maior do que 0, o que indica picos mais altos do que em uma curva normal gaussiana.
+
+```{r descriptive_stats, echo = FALSE}
+library(knitr)
+library(kableExtra)
+
+### Estatísticas descritivas Total de Desocupações:
+ed_desocup <- data.frame(
+  t(as.matrix(summary(Total)[c(1,2,3,4,5,6)])),
+  Var = var(Total),
+  Sd = sd(Total),
+  Skewness = skewness(Total),
+  Kurtosis = kurtosis(Total)
+)
+ed_desocup <- t(ed_desocup)
+
+ed_Homens <- data.frame(
+  t(as.matrix(summary(Homens)[c(1,2,3,4,5,6)])),
+  Var = var(Homens),
+  Sd = sd(Homens),
+  Skewness = skewness(Homens),
+  Kurtosis = kurtosis(Homens)
+)
+ed_Homens <- t(ed_Homens)
+
+ed_Mulheres <- data.frame(
+  t(as.matrix(summary(Mulheres)[c(1,2,3,4,5,6)])),
+  Var = var(Mulheres),
+  Sd = sd(Mulheres),
+  Skewness = skewness(Mulheres),
+  Kurtosis = kurtosis(Mulheres)
+)
+ed_Mulheres <- t(ed_Mulheres)
+
+### Dataframe unificado:
+estatisticas_df <- data.frame(
+  Estatística = rownames(ed_Homens),
+  Homens = ed_Homens[,1],
+  Mulheres = ed_Mulheres[,1],
+  Total = ed_desocup[,1],
+  row.names = NULL
+)
+
+kable(estatisticas_df, 
+      caption = "Tabela 1 - Estatísticas descritivas.",
+      align = 'c',
+      format = "latex",  # Especifica explicitamente o formato
+      booktabs = TRUE) %>%
+  kable_styling(
+    latex_options = c("hold_position", "striped"),
+    full_width = FALSE,
+    position = "center") %>%
+  row_spec(0, bold = TRUE) %>%  # Cabeçalho em negrito
+  footnote(
+    general = "Fonte: Elaboração própria.",
+    general_title = "",
+    footnote_as_chunk = TRUE,  # Alterado para TRUE
+    escape = TRUE,  # Alterado para TRUE
+    threeparttable = TRUE)  # Adicionado para melhor compatibilidade
+```
+
+A FIGURA 5 mostra a decomposição das componentes principais da série: aleatória, sazonalidade, tendência e a série observada. É possível identificar a tendência de crescimento, vista nos gráficos de linhas (FIGURA1) e boxplot (FIGURA2).
+
+```{r decomposition, echo=FALSE}
+### Decomposição da série (Somente do valor total): 
+plot(decompose(Total))  ##Decompõe a série em componentes:
+
+mtext("Figura 5 - Decomposição", 
+      side = 3,       # 3 = cima
+      line = 1,       # Posição acima da margem
+      outer = TRUE,   # Usa margem externa
+      cex = 1      # Tamanho aumentado
+    ) 
+
+# Legenda
+mtext("Fonte: Elaboração própria.",
+      side = 1,       # 1 = baixo
+      line = 1,       # Posição abaixo da margem
+      outer = TRUE,
+      cex = 0.8)
+```
+
+##### 2. Modelos:
+
+A seguir encontram-se os modelos propostos utilizando a função *tslm* e o teste de autocorrelação de resíduos de *Durbin-Watson* sob as hipóteses:
+
+$$
+H0: \text{Não há autocorrelação dos resíduos} \\
+H1: \text{Os resíduos estão correlacionados.} 
+$$
+
+Modelo 1 - Modelo com tendência.
+
+Modelo 2 - Modelo com tendência e sazonalidade.
+
+```{r modeling, echo=FALSE}
+### Modelo com tendência:
+modelo1=tslm(formula = Total ~ trend)
+summary(modelo1)
+
+## Modelo com tendencia e sazonalidade:
+modelo2=tslm(formula = Total ~ trend + season)
+summary(modelo2)
+
+## Teste de Durbin-Watson para autocorrelação dos resíduos:
+dwtest(modelo1)
+```
+
+Os *p-values* observados indicam significância para a tendência e não possui significância para sazonalidade, sendo assim, o modelo mais parcimonioso é o modelo 1.
+
+Com *p-value* = 2,2 x 10^-16^, rejeita-se a hipótese nula, indicando que os resíduos estão correlacionados.
+
+A FIGURA 6 abaixo indica a adequação do modelo 1 a série, o resultado foi uma reta crescente que não se adequou bem a série proposta, porém conseguiu captar a tendência de crescimento.
+
+```{r model_diagnostics1, echo=FALSE}
+### Valores Ajustados 
+fits=fitted(modelo1)
+### Resíduos: 
+res <- residuals(modelo1)
+
+autoplot(Total, series = "Observado") +
+  autolayer(fitted(modelo1), series = "Ajustado", color = "blue") +
+  labs(title = "Série Total vs Ajuste do Modelo 1",
+       x = "Ano", y = "Total de Desocupação") +
+  scale_color_manual(values = c("Observado" = "black", "Ajustado" = "blue")) +
+  theme_minimal() +
+labs(title = NULL, caption = "Figura 6: Série Total vs Modelo 1.", x ="Ano") +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+```
+
+A FIGURA 7 abaixo indica a adequação do modelo 2 a série, que captou melhor o comportamento da série do que o modelo 1, embora a componente sazonal não tenha sido significativa.
+
+```{r model_diagnostics2, echo=FALSE}
+autoplot(Total, series = "Observado") +
+  autolayer(fitted(modelo2), series = "Ajustado", color = "blue") +
+  labs(title = "Série Total vs Ajuste do Modelo 2",
+       x = "Ano", y = "Total de Desocupação") +
+  scale_color_manual(values = c("Observado" = "black", "Ajustado" = "blue")) +
+  theme_minimal() +
+labs(title = NULL, caption = "Figura 7: Série Total vs Modelo 2.", x ="Ano") +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+```
+
+##### 3. Análise de Resíduos:
+
+AS FIGURAS 8-11 mostram a distribuição dos resíduos, o Gráfico de Dispersão (9) mostra que os resíduos estão distribuídos de forma aleatória, também é possível observar normalidade nos gráficos de Histograma (10) e Q-Q Plot (11).
+
+```{r residual_analysis1, echo=FALSE}
+### Grafico de Linha dos Resíduos:
+autoplot(res)+ 
+  theme_classic()+
+  labs(title = "Gráfico de Linha dos Resíduos",
+       x = "Ano", y = "Resíduos") +
+labs(title = NULL, caption = "Figura 8: Gráfico de Linha dos Resíduos.", x ="Ano") +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+```
+
+```{r residual_analysis2, echo=FALSE}
+### Grafico de Dispersão dos Resíduos:
+qplot(fits, res)+
+  labs(title = "Dispersão de Resíduos")+
+  theme_classic() +
+labs(title = NULL, caption = "Figura 9: Dispersão dos Resíduos", x ="Ano") +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+```
+
+```{r residual_analysis3, echo=FALSE}
+## Histograma dos Resíduos
+hist(residuals(modelo1), 
+     freq = FALSE, 
+     col = "lightblue", 
+     main = "Histograma de Resíduos",
+     xlab = "Resíduos", 
+     ylab = "Densidade")
+
+# Adicione título e legenda separadamente
+title(sub = "Figura 10: Histograma de Resíduos", cex.sub = 0.8)
+```
+
+```{r residual_analysis4, echo=FALSE}
+## QQ-plot dos Resíduos:
+qqnorm(res, main = "Q-Q Plot dos Resíduos", 
+       xlab = "Quantis Teóricos", 
+       ylab = "Quantis Amostrais")
+qqline(res, col = "darkred", lwd = 2)
+
+# Adicionar legenda separadamente
+mtext("Figura 11: Q-Q Plot", side = 1, line = 4, cex = 0.8)
+```
+
+Para conferir maior robustez a análise de resíduos, foi realizado o teste de normalidade Anderson-Darling e o teste Shapiro-Wilk, ambos sob as hipóteses:
+
+$$
+H0: \text{Os resíduos seguem distribuição normal} \\
+H1: \text{Os resíduos não seguem distribuição norma.l} 
+$$
+
+```{r residual_analysis5, echo=FALSE}
+
+### Teste de Normalidade de Anderson-Darling
+ad.test(res)
+
+### Teste de Normalidade de Shapiro-Wilk
+shapiro.test(res)
+```
+
+Ambos os testes apresentaram p-values não significativos, ou seja, não há evidências estatísticas para rejeição da hipótese nula, com nível de confiança de 95%.
+
+#### 3. SIMULAÇÕES:
+
+Para a simulação P1: {at} com médio zero e variância 1, o resultado pode ser visto na FIGURA 12 abaixo. É possível identificar uma série estacionária em torno da média zero, enquanto o gráfico ACF não indica autocorrelação significativa, ou seja, ruído banco. O histograma apresenta o comportamento de uma curva normal, já esperado pois os valores da simulação são de uma distribuição normal padrão.
+
+```{r simulation1}
+
+#### Simulação de Processos:
+#rm(list=ls(all=TRUE))
+
+T=500
+#Proceso P1
+a=rnorm(T,0,1)
+
+par(mfrow = c(2, 2))
+plot.ts(a)
+###Estacionaria em torno da média 0. 
+Acf(a)
+
+hist(a)
+
+mtext("Figura 12 - EDA Processo 1", 
+      side = 3,       # 3 = cima
+      line = 1,       # Posição acima da margem
+      outer = TRUE,   # Usa margem externa
+      cex = 1      # Tamanho aumentado
+    ) 
+
+# Legenda
+mtext("Fonte: Elaboração própria.",
+      side = 1,       # 1 = baixo
+      line = 1,       # Posição abaixo da margem
+      outer = TRUE,
+      cex = 0.8)
+```
+
+-   ACF decai exponencialmente (típico de AR(1))
+
+-   PACF tem apenas 1 lag significativo (confirma AR(1))
+
+-   Processo estacionário pois \|φ\| = 0.7 \< 1
+
+```{r simulation2}
+#Proceso P2
+z0=10
+z=rep(0,T)
+
+z[1]=0.7*z0 + a[1]
+
+for (t in 2:T){
+  z[t]=0.7*z[t-1] + a[t]
+}
+
+z=z[101:500]
+
+par(mfrow = c(2, 2))
+
+ts.plot(z,main="Grafico de Linha")
+Acf(z)
+Pacf(z)
+hist(z)
+t(t(c(summary(z),Var=var(z),Sd=sd(z),skewness=skewness(z),kurtose=kurtosis(z))))
+```
+
+-   ACF tem 1 lag significativo (típico de MA(1))
+
+-   PACF decai exponencialmente
+
+-   Processo sempre estacionário (qualquer θ em MA(1))
+
+```{r simulation3}
+
+# Processo P3: Z_t = a_t - 0.6*a_{t-1}
+a_p3 <- rnorm(T, 0, 1)
+z_p3 <- rep(0, T)
+
+for (t in 2:T) {
+  z_p3[t] <- a_p3[t] - 0.6*a_p3[t-1]
+}
+
+# Descartar burn-in
+z_p3_final <- z_p3[101:T]
+
+# Análise
+par(mfrow = c(1, 3))
+plot.ts(z_p3_final, main = "P3: Série MA(1)")
+Acf(z_p3_final, main = "ACF de P3")
+Pacf(z_p3_final, main = "PACF de P3")
+```

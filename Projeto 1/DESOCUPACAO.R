@@ -8,7 +8,7 @@
 #install.packages("ggplot2")
 #install.packages("patchwork")
 #install.packages("rstudioapi)
-
+#install.packages("tinytex")
 #############
 
 
@@ -256,4 +256,3 @@ Acf(z)
 Pacf(z)
 hist(z)
 t(t(c(summary(z),Var=var(z),Sd=sd(z),skewness=skewness(z),kurtose=kurtosis(z))))
-
