@@ -11,5 +11,11 @@ Projeto 2 - Modelos AR, MA e ARMA:
 Estudo de caso: Serie anual de Consumo de energia elétrica no período de 1963 a 2018; 
 FAC e FACP, estimação e seleção de modelos, ruído branco com dados simulados.  
 
+Projeto 3 - Modelo SARIMA (funções arima e autoarima)
+Série de Temperatura Máxima da Região Sul, no período de janeiro de 1980 a junho de 2014. 
+Objetivos: 
+Identificar, estimar e verificar pelo menos um modelo SARIMA que acompanhe bem a variabilidade da série;
+Selecionar o melhor modelo que acompanhe bem a variabilidade da série.
+
 
 A fonte dos dados foi fornecida e tem finalidade didática. 
