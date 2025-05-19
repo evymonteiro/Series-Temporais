@@ -7,17 +7,10 @@ format:
     number-sections: true
     fig-align: center
     toc: true
+    toc-title: "SUMÁRIO"
     keep-tex: true
-header-includes:
-  - \usepackage[portuguese]{babel}
-  - \usepackage{booktabs}
-  - \usepackage{caption}
-  - \captionsetup[table]{position=top,skip=10pt,justification=centering}
-  - \usepackage{float}
-  - \floatplacement{table}{H}
-  - \usepackage{array}
-  - \setlength{\arrayrulewidth}{0.8pt}
-  - \renewcommand{\footnoterule}{}  
+    warning: false
+    include-in-header: border-figure.tex
 editor: visual
 ---
 
@@ -42,12 +35,9 @@ require(ggplot2)
 require(patchwork)
 require(rstudioapi)
 require(gridExtra)
-
-rm(list=ls(all=TRUE))
-
 ```
 
-#### 1. INTRODUÇÃO E OBJETIVOS:
+# INTRODUÇÃO E OBJETIVOS:
 
 O presente relatório visa demonstrar a análise exploratória de dados de Taxa de Desocupação do Total Brasil, no período de janeiro de 2012 ao quarto trimestre de 2022, bem como descrever as componentes da série, pelo método da decomposição.
 
@@ -71,106 +61,158 @@ Mulheres=ts(Mulheres, frequency = p, start = inicial)
 Total=ts(Total, frequency = p, start=inicial)
 ```
 
-#### 2. METODOLOGIA E RESULTADOS:
+# METODOLOGIA E RESULTADOS:
 
-##### 1. Análise Exploratória dos Dados:
+## Análise Exploratória dos Dados:
 
 O banco de dados contém 5 colunas principais, a primeira é o ano, a segunda é o trimestre, a terceira é o valor da taxa por homens, a quarta é o valor da taxa por mulheres e a quinta representa a taxa total de desocupação.
 
 Inicialmente, foi plotado o gráfico separado por genêro e total. A frequência observada é igual a 4, uma vez que os dados são trimestrais e o período inicial primeiro trimestre de 2012. Abaixo, a FIGURA 1a, FIGURA 1b e FIGURA 1c, em que é possível notar um crescimento entre os anos de 2014 e 2017, em 2018 inicia um decaimento da taxa que volta a crescer no final de 2019 e entra em queda novamente no final de 2021. O comportamento foi o mesmo para homens, mulheres e a taxa total, indicando também a não-estacionariedade da série.
 
 ```{r exploratory_plots, echo=FALSE}
+  
+#| label: fig-desocupacao
 #| layout-ncol: 1
-#| 
+#| fig-cap: "Figura 1: Evolução da taxa de desocupação por sexo e total."
+#| fig-align: center
+
 # Gráfico 1
 g1 <- autoplot(Homens) + 
-  labs(title = NULL, caption = "Figura 1a: Desocupação Masculina.", x ="Ano") +
+  labs(title = NULL, caption = "Figura 1a: Desocupação Masculina.", x = "Ano") +
+  theme_minimal() +
   theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
 # Gráfico 2
 g2 <- autoplot(Mulheres) + 
-  labs(title = NULL, caption = "Figura 1b: Desocupação Feminina.", x ="Ano") +
+  labs(title = NULL, caption = "Figura 1b: Desocupação Feminina.", x = "Ano") +
+  theme_minimal() +
   theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
 # Gráfico 3
 g3 <- autoplot(Total) + 
-  labs(title = NULL, caption = "Figura 1c: Desocupação Total.", x ="Ano") +
+  labs(title = NULL, caption = "Figura 1c: Desocupação Total.", x = "Ano") +
+  theme_minimal() +
   theme(plot.caption = element_text(hjust = 0.5, size = 10))
 
-(g1 | g2) / g3 + theme(plot.margin = margin(1, 1, 1, 1, "cm"))
+(g1 | g2) / g3 + 
+  plot_annotation(
+    title = "Figura 1 - Séries",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+      plot.caption = element_text(hjust = 0.5, size = 10)
+    )
+  ) + 
+  theme(plot.margin = margin(1, 1, 1, 1, "cm"))
 
 ```
 
-A FIGURA 2 mostra os boxplots por ano, em que é possível identificar o mesmo padrão visto na FIGURA 1, entretanto, o boxplot mostra uma maior variação da taxa no ano de 2021. Nota-se que não existe alinhamento entre as medianas, indicando variação na tendência central.
+A FIGURA 2 mostra os *boxplots* por ano, em que é possível identificar o mesmo padrão visto na FIGURA 1, entretanto, o boxplot mostra uma maior variação da taxa no ano de 2021. Nota-se que não existe alinhamento entre as medianas, indicando variação na tendência central.
 
-```{r boxplots-ano, echo=FALSE}
-par(mfrow = c(2, 2))
+```{r, boxplots, echo=FALSE}
+# Boxplot Total
+p1 <- ggplot(Total, aes(x = factor(Ano), y = Total)) +
+  geom_boxplot() +
+  labs(title = "Total x Ano", x = "Ano", y = "Total") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-boxplot(Total~Ano,main="Boxplot Total de Desocupação x Ano")
-boxplot(Homens~Ano,main="Boxplot Desocupação Homens x Ano")
-boxplot(Mulheres~Ano,main="Boxplot Desocupação Mulheres x Ano")
-# Título principal 
+# Boxplot Homens
+p2 <- ggplot(Homens, aes(x = factor(Ano), y = Homens)) +
+  geom_boxplot() +
+  labs(title = "Homens x Ano", x = "Ano", y = "Homens") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-mtext("Figura 2 - Boxplots por Ano", 
-      side = 3,       # 3 = cima
-      line = 1,       # Posição acima da margem
-      outer = TRUE,   # Usa margem externa
-      cex = 1      # Tamanho aumentado
-    ) 
+# Boxplot Mulheres
+p3 <- ggplot(Mulheres, aes(x = factor(Ano), y = Mulheres)) +
+  geom_boxplot() +
+  labs(title = "Mulheres x Ano", x = "Ano", y = "Mulheres") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-# Legenda
-mtext("Fonte: Elaboração própria.",
-      side = 1,       # 1 = baixo
-      line = 1,       # Posição abaixo da margem
-      outer = TRUE,
-      cex = 0.8)
+# Combina os gráficos com patchwork e adiciona título geral e legenda
+(p1 | p2) / p3 +
+  plot_annotation(
+    title = "Figura 2 - Boxplots por Ano",
+    caption = "Fonte: Elaboração própria."
+  ) & 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+    plot.caption = element_text(hjust = 0.5, size = 10)
+  )
+
 ```
 
-A FIGURA 3 mostra os boxplots por trimestre, em que percebe-se um certo grau de alinhamento entre as medianas, indicando uma tendência central, ou seja, não existe muita variação entre os trimestres em todos os cenários analisados.
+A FIGURA 3 mostra os *boxplots* por trimestre, em que percebe-se um certo grau de alinhamento entre as medianas, indicando uma tendência central, ou seja, não existe muita variação entre os trimestres em todos os cenários analisados.
 
 ```{r boxplots-trimestres, echo=FALSE}
-### Boxplot por trimestre:
-par(mfrow = c(2, 2))
-boxplot(Total~Trimestre,main="Total de Desocupação x Trimestre")
-boxplot(Homens~Trimestre,main="Desocupação Homens x Trimestre")
-boxplot(Mulheres~Trimestre,main="Desocupação Mulheres x Trimestre")
 
-mtext("Figura 3 - Boxplots por Trimestre", 
-      side = 3,       # 3 = cima
-      line = 1,       # Posição acima da margem
-      outer = TRUE,   # Usa margem externa
-      cex = 1      # Tamanho aumentado
-    ) 
+## Gráfico 1: Total
+g1 <- ggplot(Total, aes(x = factor(Trimestre), y = Total)) +
+  geom_boxplot() +
+  labs(title = "Total x Trimestre", x = "Trimestre", y = "Total") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-# Legenda
-mtext("Fonte: Elaboração própria.",
-      side = 1,       # 1 = baixo
-      line = 1,       # Posição abaixo da margem
-      outer = TRUE,
-      cex = 0.8)
+# Gráfico 2: Homens
+g2 <- ggplot(Homens, aes(x = factor(Trimestre), y = Homens)) +
+  geom_boxplot() +
+  labs(title = "Homens x Trimestre", x = "Trimestre", y = "Homens") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Gráfico 3: Mulheres
+g3 <- ggplot(Mulheres, aes(x = factor(Trimestre), y = Mulheres)) +
+  geom_boxplot() +
+  labs(title = "Mulheres x Trimestre", x = "Trimestre", y = "Mulheres") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Montagem dos gráficos com título e legenda geral
+(g1 | g2 | g3) +
+  plot_annotation(
+    title = "Figura 3 - Boxplots por Trimestre",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 12),
+      plot.caption = element_text(hjust = 0.5, size = 10)
+    )
+  )
 ```
 
-A FIGURA 4 mostra os histogramas de densidade, é possível perceber que a taxa de desocupação total de maior densidade é a 12, também não é possível identificar normalidade nos dados.
+A FIGURA 4 mostra os histogramas de densidade, não é possível identificar normalidade nos dados.
 
-```{r histograms}
-### Histogramas:
-par(mfrow = c(2, 2))
-hist(Homens, freq = FALSE, col = "lightblue", xlab = "Homens")
-hist(Mulheres, freq = FALSE, col = "lightpink", xlab = "Mulheres")
-hist(Total, freq = FALSE, col = "lightgray", xlab = "Total")
-par(mfrow = c(1, 1))
+```{r histograms, echo=FALSE}
 
-mtext("Figura 4 - Histogramas", 
-      side = 3,       # 3 = cima
-      line = 1,       # Posição acima da margem
-      outer = TRUE,   # Usa margem externa
-      cex = 1      # Tamanho aumentado
-    ) 
+# Histograma 1: Homens
+h1 <- ggplot(Homens, aes(x = Homens)) +
+  geom_histogram(aes(y = ..density..), fill = "lightblue", color = "black", bins = 30) +
+  labs(title = "Homens", x = "Homens", y = "Densidade") +
+  theme_classic()
 
-# Legenda
-mtext("Fonte: Elaboração própria.",
-      side = 1,       # 1 = baixo
-      line = 1,       # Posição abaixo da margem
-      outer = TRUE,
-      cex = 0.8)
+# Histograma 2: Mulheres
+h2 <- ggplot(Mulheres, aes(x = Mulheres)) +
+  geom_histogram(aes(y = ..density..), fill = "lightpink", color = "black", bins = 30) +
+  labs(title = "Mulheres", x = "Mulheres", y = "Densidade") +
+  theme_classic()
+
+# Histograma 3: Total
+h3 <- ggplot(Total, aes(x = Total)) +
+  geom_histogram(aes(y = ..density..), fill = "lightgray", color = "black", bins = 30) +
+  labs(title = "Total", x = "Total", y = "Densidade") +
+  theme_classic()
+
+# Montagem dos histogramas com título e legenda geral
+(h1 | h2 | h3) +
+  plot_annotation(
+    title = "Figura 4 - Histogramas",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 12),
+      plot.caption = element_text(hjust = 0.5, size = 10)
+    )
+  )
 ```
 
 A TABELA 1 abaixo mostra as estatísticas descritivas para as variáveis analisadas, em que todas possuem assimetria negativa, o que subestima valores médios. Compreende-se também que as mulheres possuem a maior taxa de desocupação mínima, com 7,8 contra 5,1 dos homens e 8,0 do total. Os valores da média também são mais altos para mulheres (12,70) do que para os homens (8,89) e o total (10,53). O valor da curtose para todas as variáveis é maior do que 0, o que indica picos mais altos do que em uma curva normal gaussiana.
@@ -234,28 +276,28 @@ kable(estatisticas_df,
     threeparttable = TRUE)  # Adicionado para melhor compatibilidade
 ```
 
-A FIGURA 5 mostra a decomposição das componentes principais da série: aleatória, sazonalidade, tendência e a série observada. É possível identificar a tendência de crescimento, vista nos gráficos de linhas (FIGURA1) e boxplot (FIGURA2).
+A FIGURA 5 mostra a decomposição das componentes principais da série: aleatória, sazonalidade, tendência e a série observada. É possível identificar a tendência de crescimento, vista nos gráficos de linhas (FIGURA1) e *boxplot* (FIGURA2).
 
 ```{r decomposition, echo=FALSE}
-### Decomposição da série (Somente do valor total): 
-plot(decompose(Total))  ##Decompõe a série em componentes:
+# Define margens externas para permitir título e legenda
+par(oma = c(4, 0, 4, 0))  # (base, esquerda, topo, direita)
 
+# Decomposição com múltiplos subplots
+plot(decompose(Total))  ##Decompõe a série em componentes
+
+# Título
 mtext("Figura 5 - Decomposição", 
-      side = 3,       # 3 = cima
-      line = 1,       # Posição acima da margem
-      outer = TRUE,   # Usa margem externa
-      cex = 1      # Tamanho aumentado
-    ) 
+      side = 3, line = 3, outer = TRUE, cex = 1)
 
-# Legenda
-mtext("Fonte: Elaboração própria.",
-      side = 1,       # 1 = baixo
-      line = 1,       # Posição abaixo da margem
-      outer = TRUE,
-      cex = 0.8)
+# Legenda (fonte)
+mtext("Fonte: Elaboração própria.", 
+      side = 1, line = 3, outer = TRUE, cex = 0.8)
+
+# (opcional) reset margens se for seguir com outros plots depois
+par(oma = c(0, 0, 0, 0))
 ```
 
-##### 2. Modelos:
+## Modelos:
 
 A seguir encontram-se os modelos propostos utilizando a função *tslm* e o teste de autocorrelação de resíduos de *Durbin-Watson* sob as hipóteses:
 
@@ -288,6 +330,7 @@ Com *p-value* = 2,2 x 10^-16^, rejeita-se a hipótese nula, indicando que os res
 A FIGURA 6 abaixo indica a adequação do modelo 1 a série, o resultado foi uma reta crescente que não se adequou bem a série proposta, porém conseguiu captar a tendência de crescimento.
 
 ```{r model_diagnostics1, echo=FALSE}
+
 ### Valores Ajustados 
 fits=fitted(modelo1)
 ### Resíduos: 
@@ -298,48 +341,53 @@ autoplot(Total, series = "Observado") +
   labs(title = "Série Total vs Ajuste do Modelo 1",
        x = "Ano", y = "Total de Desocupação") +
   scale_color_manual(values = c("Observado" = "black", "Ajustado" = "blue")) +
-  theme_minimal() +
-labs(title = NULL, caption = "Figura 6: Série Total vs Modelo 1.", x ="Ano") +
+  theme_classic() +
+labs(title = "Figura 6: Série Total vs Modelo 1", caption = "Fonte: Elaboração Própria.", x ="Ano") +
   theme(plot.caption = element_text(hjust = 0.5, size = 10))
 ```
 
 A FIGURA 7 abaixo indica a adequação do modelo 2 a série, que captou melhor o comportamento da série do que o modelo 1, embora a componente sazonal não tenha sido significativa.
 
 ```{r model_diagnostics2, echo=FALSE}
+
 autoplot(Total, series = "Observado") +
   autolayer(fitted(modelo2), series = "Ajustado", color = "blue") +
   labs(title = "Série Total vs Ajuste do Modelo 2",
        x = "Ano", y = "Total de Desocupação") +
   scale_color_manual(values = c("Observado" = "black", "Ajustado" = "blue")) +
-  theme_minimal() +
-labs(title = NULL, caption = "Figura 7: Série Total vs Modelo 2.", x ="Ano") +
+  theme_classic() +
+labs(title = "Figura 7: Série Total vs Modelo 2.", caption = "Fonte: Elaboração Própria.", x ="Ano") +
   theme(plot.caption = element_text(hjust = 0.5, size = 10))
 ```
 
-##### 3. Análise de Resíduos:
+## Análise de Resíduos:
 
 AS FIGURAS 8-11 mostram a distribuição dos resíduos, o Gráfico de Dispersão (9) mostra que os resíduos estão distribuídos de forma aleatória, também é possível observar normalidade nos gráficos de Histograma (10) e Q-Q Plot (11).
 
 ```{r residual_analysis1, echo=FALSE}
+
+
 ### Grafico de Linha dos Resíduos:
 autoplot(res)+ 
   theme_classic()+
   labs(title = "Gráfico de Linha dos Resíduos",
        x = "Ano", y = "Resíduos") +
-labs(title = NULL, caption = "Figura 8: Gráfico de Linha dos Resíduos.", x ="Ano") +
+labs(title = "Figura 8: Gráfico de Linha dos Resíduos.", caption = "Fonte: Elaboração Própria.", x ="Ano") +
   theme(plot.caption = element_text(hjust = 0.5, size = 10))
 ```
 
 ```{r residual_analysis2, echo=FALSE}
+
 ### Grafico de Dispersão dos Resíduos:
 qplot(fits, res)+
   labs(title = "Dispersão de Resíduos")+
   theme_classic() +
-labs(title = NULL, caption = "Figura 9: Dispersão dos Resíduos", x ="Ano") +
+labs(title = "Figura 9: Dispersão dos Resíduos", caption = "Fonte: Elaboração Própria.", x ="Ano") +
   theme(plot.caption = element_text(hjust = 0.5, size = 10))
 ```
 
 ```{r residual_analysis3, echo=FALSE}
+
 ## Histograma dos Resíduos
 hist(residuals(modelo1), 
      freq = FALSE, 
@@ -353,8 +401,9 @@ title(sub = "Figura 10: Histograma de Resíduos", cex.sub = 0.8)
 ```
 
 ```{r residual_analysis4, echo=FALSE}
+
 ## QQ-plot dos Resíduos:
-qqnorm(res, main = "Q-Q Plot dos Resíduos", 
+qqnorm(residuals(modelo1), main = "Q-Q Plot dos Resíduos", 
        xlab = "Quantis Teóricos", 
        ylab = "Quantis Amostrais")
 qqline(res, col = "darkred", lwd = 2)
@@ -363,7 +412,7 @@ qqline(res, col = "darkred", lwd = 2)
 mtext("Figura 11: Q-Q Plot", side = 1, line = 4, cex = 0.8)
 ```
 
-Para conferir maior robustez a análise de resíduos, foi realizado o teste de normalidade Anderson-Darling e o teste Shapiro-Wilk, ambos sob as hipóteses:
+Para conferir maior robustez a análise de resíduos, foi realizado o teste de normalidade *Anderson-Darling* e o teste *Shapiro-Wilk*, ambos sob as hipóteses:
 
 $$
 H0: \text{Os resíduos seguem distribuição normal} \\
@@ -379,93 +428,117 @@ ad.test(res)
 shapiro.test(res)
 ```
 
-Ambos os testes apresentaram p-values não significativos, ou seja, não há evidências estatísticas para rejeição da hipótese nula, com nível de confiança de 95%.
+Ambos os testes apresentaram *p-values* não significativos, ou seja, não há evidências estatísticas para rejeição da hipótese nula, com nível de confiança de 95%.
 
-#### 3. SIMULAÇÕES:
+# SIMULAÇÕES:
 
-Para a simulação P1: {at} com médio zero e variância 1, o resultado pode ser visto na FIGURA 12 abaixo. É possível identificar uma série estacionária em torno da média zero, enquanto o gráfico ACF não indica autocorrelação significativa, ou seja, ruído banco. O histograma apresenta o comportamento de uma curva normal, já esperado pois os valores da simulação são de uma distribuição normal padrão.
+Para a simulação P1: {at} com médio zero e variância 1, o resultado pode ser visto na FIGURA 12 abaixo. É possível identificar uma série estacionária em torno da média zero, enquanto o gráfico ACF não indica autocorrelação significativa, ou seja, é um ruído banco. O histograma apresenta o comportamento de uma curva normal, já esperado pois os valores da simulação são de uma distribuição normal padrão.
 
-```{r simulation1}
+```{r simulation1, echo=FALSE}
 
 #### Simulação de Processos:
 #rm(list=ls(all=TRUE))
 
-T=500
-#Proceso P1
-a=rnorm(T,0,1)
+T <- 500
+a <- rnorm(T, 0, 1)
 
-par(mfrow = c(2, 2))
-plot.ts(a)
-###Estacionaria em torno da média 0. 
-Acf(a)
+# Define layout 2x2 e margens internas e externas
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1), oma = c(4, 0, 4, 0))
 
-hist(a)
+plot.ts(a, main = "Série Temporal")
 
+Acf(a, main = "ACF")
+
+hist(a, main = "Histograma", col = "lightblue", border = "black")
+
+# Título geral na margem externa superior
 mtext("Figura 12 - EDA Processo 1", 
-      side = 3,       # 3 = cima
-      line = 1,       # Posição acima da margem
-      outer = TRUE,   # Usa margem externa
-      cex = 1      # Tamanho aumentado
-    ) 
+      side = 3, line = 2, outer = TRUE, cex = 1)
 
-# Legenda
-mtext("Fonte: Elaboração própria.",
-      side = 1,       # 1 = baixo
-      line = 1,       # Posição abaixo da margem
-      outer = TRUE,
-      cex = 0.8)
+# Legenda na margem externa inferior
+mtext("Fonte: Elaboração própria.", 
+      side = 1, line = 2, outer = TRUE, cex = 0.8)
+
 ```
+
+A simulação do Processo 2 é possível identificar:
 
 -   ACF decai exponencialmente (típico de AR(1))
 
 -   PACF tem apenas 1 lag significativo (confirma AR(1))
 
--   Processo estacionário pois \|φ\| = 0.7 \< 1
+-   Processo estacionário pois \|phi\| = 0.7 \< 1
 
-```{r simulation2}
-#Proceso P2
-z0=10
-z=rep(0,T)
+```{r simulation2, echo=FALSE}
+# Processo P2
+z0 <- 10
+z <- rep(0, T)
 
-z[1]=0.7*z0 + a[1]
+z[1] <- 0.7 * z0 + a[1]
 
-for (t in 2:T){
-  z[t]=0.7*z[t-1] + a[t]
+for (t in 2:T) {
+  z[t] <- 0.7 * z[t - 1] + a[t]
 }
 
-z=z[101:500]
+z <- z[101:500]
 
-par(mfrow = c(2, 2))
+# Ajusta margens para título e legenda externos
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1), oma = c(4, 0, 4, 0))
 
-ts.plot(z,main="Grafico de Linha")
-Acf(z)
-Pacf(z)
-hist(z)
+ts.plot(z, main = "Gráfico de Linha")
+Acf(z, main = "ACF")
+Pacf(z, main = "PACF")
+hist(z, main = "Histograma", col = "lightblue", border = "black")
+
+# Título geral na margem externa superior
+mtext("Figura 13 - EDA Processo 2", 
+      side = 3, line = 2, outer = TRUE, cex = 1)
+
+# Legenda na margem externa inferior
+mtext("Fonte: Elaboração própria.", 
+      side = 1, line = 2, outer = TRUE, cex = 0.8)
+```
+
+Abaixo os valores das estatísticas descritivas:
+
+```{r, echo=FALSE}
 t(t(c(summary(z),Var=var(z),Sd=sd(z),skewness=skewness(z),kurtose=kurtosis(z))))
 ```
 
--   ACF tem 1 lag significativo (típico de MA(1))
+Simulação do Processo 3:
 
--   PACF decai exponencialmente
+-   ACF tem 1 lag significativo (típico de MA(1)).
 
--   Processo sempre estacionário (qualquer θ em MA(1))
+-   PACF decai exponencialmente.
 
-```{r simulation3}
+-   Processo sempre estacionário (qualquer theta em MA(1)).
+
+```{r simulation3, echo=FALSE}
 
 # Processo P3: Z_t = a_t - 0.6*a_{t-1}
 a_p3 <- rnorm(T, 0, 1)
 z_p3 <- rep(0, T)
 
 for (t in 2:T) {
-  z_p3[t] <- a_p3[t] - 0.6*a_p3[t-1]
+  z_p3[t] <- a_p3[t] - 0.6 * a_p3[t - 1]
 }
 
 # Descartar burn-in
 z_p3_final <- z_p3[101:T]
 
-# Análise
-par(mfrow = c(1, 3))
+# Ajusta margens para título e legenda externos
+par(mfrow = c(1, 3), mar = c(4, 4, 2, 1), oma = c(4, 0, 4, 0))
+
 plot.ts(z_p3_final, main = "P3: Série MA(1)")
 Acf(z_p3_final, main = "ACF de P3")
 Pacf(z_p3_final, main = "PACF de P3")
+
+# Título geral na margem externa superior
+mtext("Figura 14 - EDA Processo 3", 
+      side = 3, line = 2, outer = TRUE, cex = 1)
+
+# Legenda na margem externa inferior
+mtext("Fonte: Elaboração própria.", 
+      side = 1, line = 2, outer = TRUE, cex = 0.8)
+
 ```

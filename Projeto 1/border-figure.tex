@@ -1,0 +1,19 @@
+\usepackage{float}
+\floatplacement{figure}{H}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\captionsetup[table]{position=top,skip=10pt,justification=centering}
+\usepackage{array}
+\setlength{\arrayrulewidth}{0.8pt}
+\renewcommand{\footnoterule}{}
+\usepackage{etoolbox}
+\usepackage[export]{adjustbox} % necessário para manter alinhamento com \fbox
+
+% Redefine \includegraphics para adicionar borda preta de 1pt em todas as imagens
+\makeatletter
+\let\oldincludegraphics\includegraphics
+\renewcommand{\includegraphics}[2][]{%
+  \fbox{\oldincludegraphics[#1]{#2}}%
+}
+\makeatother
