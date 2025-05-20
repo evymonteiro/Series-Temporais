@@ -1,0 +1,833 @@
+---
+title: "RELATÓRIO CONSUMO DE ENERGIA ELÉTRICA NO BRASIL (1963 a 2018)"
+author: "Évelyn Muniz"
+format: 
+  pdf:
+    fig-cap-location: bottom
+    number-sections: true
+    fig-width: 8
+    fig-height: 6
+    fig-align: center
+    toc: true
+    toc-title: "SUMÁRIO"
+    keep-tex: true
+    warning: false
+    include-in-header: border-figure.tex
+editor: visual
+---
+
+```{r, setup, echo=FALSE}
+require(moments)
+require(openxlsx)
+require(nortest)
+require(lmtest)
+require(forecast)
+require(ggplot2)
+require(patchwork)
+require(rstudioapi)
+require(gridExtra)
+```
+
+# Dados Simulados:
+
+Para fins didáticos de compreensão dos gráficos ACF e PACF:
+
+## Correlogramas:
+
+```{r, correlograms, echo=FALSE}
+dados <- read.xlsx(file.choose())
+T=nrow(dados)
+y=dados[,1]
+p=1 #frequencia
+y=ts(y,frequency=p)
+```
+
+Foi possível identificar autocorrelação até lag 6 no ACF com decaimento exponencial, indicando modelo ARIMA (1,d,0) e autocorrelação a partir do lag 25 no PACF, como pode ser visto na FIGURA 1 abaixo:
+
+```{r, correlograms-graph, echo=FALSE}
+p1 <- autoplot(y) + 
+  labs(title = "Gráfico de Linha", caption = "Figura 1c", x = "Ano") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+p2 <- ggAcf(y, lag.max = 25, ci = 0.99) + 
+  labs(title = "ACF", caption = "Figura 1a", x = "Ano") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+p3 <- ggPacf(y, lag.max = 25, ci = 0.99) + 
+  labs(title = "PACF", caption = "Figura 1b", x = "Ano") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+((p2 | p3)/p1) +
+  plot_annotation(
+    title = "Figura 1 - Correlogramas e Gráfico de Linhas",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+      plot.caption = element_text(hjust = 0.5, size = 10),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    )
+  )
+```
+
+## Modelo:
+
+O modelo arima (1,0,0) com AR1 significativo e coeficientes dentro do intervalo \[-1, 1\].
+
+```{r, model1, echo=FALSE}
+modelo <- Arima(y,order=c(1,0,0),include.constant=F) #Arima (p,d,q) 
+### p = autoregressivos, d = diferenciações, q = média móvel)
+summary(modelo)
+coeftest(modelo)
+```
+
+### Resíduos:
+
+De acordo com a FIGURA 2 abaixo, é possível identificar que os resíduos não apresentaram autocorrelação a um nível de confiança de 99%.
+
+```{r, residuals1, echo=FALSE}
+residuos=residuals(modelo)
+sresiduos=scale(residuos)
+
+# Gráficos
+p1 <- autoplot(residuos) + 
+  labs(title = NULL, caption = "Gráfico de resíduos", x = "Tempo") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+p2 <- ggAcf(residuos, ci = 0.99) + 
+  labs(title = NULL, caption = "Autocorrelação (ACF) com IC 99%") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+p3 <- ggPacf(residuos, ci = 0.99) + 
+  labs(title = NULL, caption = "Autocorrelação Parcial (PACF) com IC 99%") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+# Layout: p2 e p3 lado a lado em cima, p1 embaixo
+(p2 | p3) / p1 + 
+  plot_annotation(
+    title = "Figura 2 - Correlogramas e gráfico dos resíduos",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+      plot.caption = element_text(hjust = 0.5, size = 10),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    )
+  )
+```
+
+A adequação do modelo com a série pode ser vista na FIGURA 3 abaixo:
+
+```{r, fits1, echo=FALSE}
+
+fits <- fitted(modelo)  # Valores previstos
+autoplot(y, series = "Observado") +
+  autolayer(fits, series = "Ajustado", color = "red") +
+  labs(
+    title = "Figura 3: Série vs. Modelo",  # Título da figura no topo
+    x = "Tempo",
+    y = "Valor",
+    caption = "Fonte: Elaboração própria"                   # Legenda embaixo
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    plot.caption = element_text(hjust = 0.5, size = 10),
+    legend.position = "bottom"
+  ) +
+  scale_color_manual(values = c("Observado" = "black", "Ajustado" = "red"))
+```
+
+#### Normalidade:
+
+Abaixo, a FIGURA 4 mostra a análise de normalidade dos resíduos, por meio do histograma e q-qplot.
+
+```{r, normality1, echo=FALSE}
+p1 <- ggplot(data.frame(sresiduos), aes(x = sresiduos)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "lightblue", color = "black") +
+  geom_density(color = "red", size = 1) +
+  labs(title = NULL, caption = "Figura 4a: Histograma com curva de densidade", x = "Resíduos padronizados") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+p2 <- ggplot(data.frame(sresiduos), aes(sample = sresiduos)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = NULL, caption = "Figura 4b: QQ-plot dos resíduos padronizados") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+(p1 / p2) +
+  plot_annotation(
+    title = "Figura 4 - Análise dos Resíduos Padronizados",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      plot.caption = element_text(hjust = 0.5, size = 10),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    )
+  )
+```
+
+Graficamente os resíduos apresentam normalidade, mas para conferir maior robustez, foi realizado o teste de hipóteses de Shapiro-Wilk e o ad.test, sob as hipóteses:
+
+$$
+H0: \text{Os resíduos são normais} \\
+H1: \text{Os resíduos não apresentam normalidade.} 
+$$
+
+```{r, shapiro1, echo=FALSE}
+shapiro.test(sresiduos)
+ad.test(sresiduos)
+```
+
+Com 99% de confiança, não há evidências para rejeição da hipótese nula, portanto, pode-se considerar que os resíduos seguem distribuição normal.
+
+#### Autocorrelação:
+
+A FIGURA 5 abaixo mostra o teste de Ljung-Box e o gráfico ACF para presença de autocorrelação nos resíduos:
+
+```{r tsdiag1, echo=FALSE, fig.height=6, fig.width=8}
+# Define layout gráfico com margens externas
+par(mfrow = c(2, 2), oma = c(4, 4, 4, 2))  # oma = margens externas
+
+# Gera os diagnósticos
+tsdiag(modelo, gof.lag = 16)
+
+# Adiciona título e legenda fora dos gráficos
+mtext("Figura 5 - Diagnóstico do Modelo", side = 3, line = 1, outer = TRUE, cex = 1, font = 2)
+mtext("Fonte: Elaboração própria.", side = 1, line = 2, outer = TRUE, cex = 0.8)
+
+```
+
+O gráfico ACF e o de Ljung-Box não indicaram presença de autocorrelação nos resíduos. O teste de Ljung-Box sob as hipóteses:
+
+$$
+H0: \text{Não há autocorrelação dos resíduos} \\
+H1: \text{Os resíduos estão correlacionados.} 
+$$
+
+```{r, boxtest1, echo=FALSE}
+Box.test(residuos,lag=5,type="Ljung")
+
+```
+
+Com *p-value* = 0,988 não há evidências para rejeição da hipótese nula. Portanto é um resíduo branco gaussiano, uma vez que apresenta distribuição normal e independência.
+
+# Estudo de Caso: Consumo de Energia Elétrica (1963 a 2018).
+
+## Introdução
+
+Para este trabalho, foi utilizado o banco de dados do Consumo de Energia Elétrica no Brasil durante os anos de 1963 a 2018. Os dados tem frequência de uma observação por ano associadas ao consumo total daquele ano.
+
+```{r, data-case, echo=FALSE}
+dados <- read.xlsx(file.choose(),"energia")
+T=nrow(dados)
+#print(dados)
+y=dados[,2] #seleção de segunda coluna de energia
+
+p=1 #frequencia uma observação por ano.
+inicial=c(1963,1)
+y=ts(y,frequency=p,start=inicial)
+```
+
+## METODOLOGIA E RESULTADOS
+
+Após transformar os dados em um arquivo do tipo ts, foi feito o gráfico de linhas, o gráfico ACF e o PACF, como pode ser visto na FIGURA 6 abaixo, em que é possível notar um aparente crescimento ao longo dos anos, autocorrelação até o lag 12 com decaimento exponencial e ausência de autocorrelação parcial, com primeiro lag significativo.
+
+```{r, correlograms2, echo=FALSE}
+p1 <- autoplot(y) +
+  labs(
+    title = NULL,
+    caption = "Figura 6a.",
+    x = "Tempo", y = "Valor"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 7))
+
+# ACF
+p2 <- ggAcf(y, ci = 0.99) +
+  labs(
+    title = NULL,
+    caption = "Figura 6b.",
+    x = "Lag"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+# PACF
+p3 <- ggPacf(y, ci = 0.99) +
+  labs(
+    title = NULL,
+    caption = "Figura 6c.",
+    x = "Lag"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+(p1 / (p2 | p3)) +
+  plot_annotation(
+    title = "Figura 6 - Análise Exploratória da Série Temporal",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+      plot.caption = element_text(hjust = 0.5, size = 10),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    )
+  )
+```
+
+A primeira diferenciação para tornar a série estacionária, aqui os parâmetros são estabelecidos com lag = número de posições que os elementos são subtraídos, dif = quantidade de vezes que a série será diferenciada
+
+```{r, dify, echo=TRUE}
+dif_y=diff(y,lag=1,dif=1)  
+```
+
+A FIGURA 7 abaixo mostra a nova série após a diferenciação. O gráfico de linha que antes aparentava um crescimento quase que exponencial, agora indica crescimento mas também ciclos (FIGURA7a). É possível idenificar autocorrelação só até o lag 2 (FIGURA7b) e autocorrelação a partir do lag 13 com decaimento alternado (FIGURA7c).
+
+```{r, dif-correlograms, echo=FALSE}
+
+# Gráfico de linha da série diferenciada
+p1 <- autoplot(dif_y) +
+  labs(
+    title = NULL,
+    caption = "Figura 7a.",
+    x = "Tempo", y = "Valor"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 8))
+
+# ACF da série diferenciada
+p2 <- ggAcf(dif_y) +
+  labs(
+    title = NULL,
+    caption = "Figura 7b",
+    x = "Lag"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 8))
+
+# PACF da série diferenciada
+p3 <- ggPacf(dif_y) +
+  labs(
+    title = NULL,
+    caption = "Figura 7c.",
+    x = "Lag"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 8))
+
+# Combina os gráficos com título e legenda gerais
+(p1 / (p2 | p3)) +
+  plot_annotation(
+    title = "Figura 7 - Análise da Série Temporal Diferenciada",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 10),
+      plot.caption = element_text(hjust = 0.5, size = 10),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    )
+  )
+```
+
+### Modelo:
+
+A partir da série diferenciada, surge o primeiro modelo, que teve como base:
+
+-   Sem constante autoregressora AR,
+
+-   1 diferenciação (vista por dif_y) e
+
+-   1 componente MA.
+
+Abaixo, o ajuste do modelo Arima (0,1,1), que resultou na componente MA(1) significativa.
+
+```{r, model2, echo=TRUE}
+modelo <- Arima(y,order=c(0,1,1),include.constant=F)
+
+coeftest(modelo)
+```
+
+#### Resíduos:
+
+Abaixo, a FIGURA 8 contendo o gráfico ACF e PACF dos resíduos. Visualmente, o gráfico ACFP não indica correlação entre os resíduos, enquanto o gráfico ACF indica no lag 2.
+
+```{r, correlograms3, echo=FALSE}
+# Resíduos do modelo
+residuos <- residuals(modelo)
+
+# ACF dos resíduos
+p1 <- ggAcf(residuos, ci = 0.99) +
+  labs(
+    title = NULL,
+    caption = "Figura 8a.",
+    x = "Lag"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 8))
+
+# PACF dos resíduos
+p2 <- ggPacf(residuos, ci = 0.99) +
+  labs(
+    title = NULL,
+    caption = "Figura 8b).",
+    x = "Lag"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 8))
+
+(p1 | p2) +
+  plot_annotation(
+    title = "Figura 8 - Correlogramas dos Resíduos do Modelo",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 8),
+      plot.caption = element_text(hjust = 0.5, size = 10),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    )
+  )
+```
+
+A FIGURA 8 mostra a adequação do modelo a série. O gráfico indica que o modelo ARIMA(0,1,1) conseguiu se adequar a série proposta.
+
+```{r, fitts2, echo=FALSE}
+p <- autoplot(y, series = "Observado") + 
+  autolayer(fitted(modelo), series = "ARIMA", linetype = "dashed") +
+  ggtitle(NULL) +
+  xlab("Ano") + 
+  ylab("Consumo de Energia") +
+  scale_color_manual(values = c("Observado" = "black", "ARIMA" = "red")) +
+  theme_classic() +
+  theme(legend.title = element_blank(),
+        plot.caption = element_text(hjust = 0.5, size = 10))
+p + plot_annotation(
+  title = "Figura 9 - Série Observada vs. ARIMA (0,1,1)",
+  caption = "Fonte: Elaboração própria.",
+  theme = theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    plot.caption = element_text(hjust = 0.5, size = 10),
+    plot.margin = margin(1, 1, 1, 1, "cm")
+  )
+)
+```
+
+A condição de normalidade dos resíduos foi verificada por meio do histograma (FIGURA 10), do teste de *Shapiro-Wilk* e do teste *Anderson-Darling*.
+
+```{r, histogram-res1, echo=FALSE}
+df_res <- data.frame(residuos = residuals(modelo))
+
+p_hist <- ggplot(df_res, aes(x = residuos)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "lightblue", color = "black") +
+  labs(
+    title = NULL,
+    caption = NULL,
+    x = "Resíduos", y = "Densidade"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+p_hist + plot_annotation(
+  title = "Figura 10 - Normalidade de Resíduos",
+  caption = "Fonte: Elaboração própria.",
+  theme = theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    plot.caption = element_text(hjust = 0.5, size = 10),
+    plot.margin = margin(1, 1, 1, 1, "cm")
+  )
+)
+
+```
+
+Sob as hipóteses:
+
+$$
+H0: \text{Os resíduos são normais} \\
+H1: \text{Os resíduos não apresentam normalidade.} 
+$$
+
+```{r, normality2, echo=FALSE}
+#Shapiro-Wilk normality test
+shapiro.test(residuos)
+
+#Anderson-Darling normality test
+ad.test(residuos)
+###H0: Os resíduos possuem distribuição normal vs.
+###H1: Os resíduos não possuem distribuição normal.
+###Com p-value = 5.409e-7, H0 é rejeitada. 
+
+```
+
+A hipótese nula foi rejeitada em ambos os testes, sendo possível inferir que os resíduos não apresentam normalidade.
+
+Por meio do gráfico Q-QPlot (FIGURA 10) a seguir, confirmou-se a ausência de normalidade:
+
+```{r, qqplot, echo=FALSE}
+# Padroniza os resíduos
+sresiduos <- scale(residuos)
+df_sres <- data.frame(sresiduos = sresiduos)
+
+# QQ-Plot
+p_qq <- ggplot(df_sres, aes(sample = sresiduos)) +
+  stat_qq(size = 1) +
+  stat_qq_line(color = "red") +
+  labs(
+    title = NULL,
+    caption = NULL,
+    x = "Quantis teóricos", y = "Quantis amostrais"
+  ) +
+  theme_classic(base_size = 10) +
+  theme(
+    plot.caption = element_text(hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 10)
+  )
+
+# Adiciona título e legenda geral
+p_qq + plot_annotation(
+  title = "Figura 11 - Verificação da Normalidade dos Resíduos",
+  caption = "Fonte: Elaboração própria.",
+  theme = theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    plot.caption = element_text(hjust = 0.5, size = 10),
+    plot.margin = margin(1, 1, 1, 1, "cm")
+  )
+)
+
+```
+
+Abaixo na TABELA 1, as estatísticas do modelo e dos resíduos:
+
+```{r, statistics-model, echo=FALSE}
+
+library(knitr)
+library(kableExtra)
+
+# Estatísticas do modelo
+estat_modelo <- round(rbind(
+  MSE = accuracy(modelo)[2],
+  AIC = modelo$aic,
+  BIC = modelo$aicc
+), 3)
+
+# Estatísticas dos resíduos (sem p-valor aqui)
+estat_residuos <- round(rbind(
+  Média = mean(residuals(modelo)),
+  Sd = sd(residuals(modelo)),
+  Skewness = skewness(residuals(modelo)),
+  Kurtosis = kurtosis(residuals(modelo))
+), 3)
+
+# Criando data frames individuais para juntar depois
+tabela_avaliacao <- data.frame(
+  Estatística = rownames(estat_modelo),
+  Valor = estat_modelo[,1],
+  row.names = NULL
+)
+
+tabela_residuos <- data.frame(
+  Estatística = rownames(estat_residuos),
+  Valor = estat_residuos[,1],
+  row.names = NULL
+)
+
+# Adiciona o p-valor de Shapiro como string no data.frame dos resíduos
+tabela_residuos <- rbind(
+  tabela_residuos,
+  data.frame(Estatística = "p_valor_Shap", Valor = "1.353e-05")
+)
+
+# Junta as duas tabelas numa só
+tabela_final <- rbind(tabela_avaliacao, tabela_residuos)
+
+# Geração da tabela formatada em LaTeX
+kable(tabela_final,
+      caption = "Tabela 1 - Métricas do modelo 1.",
+      align = 'c',
+      format = "latex",
+      booktabs = TRUE) %>%
+  kable_styling(
+    latex_options = c("hold_position", "striped"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE) %>%
+  footnote(
+    general = "Fonte: Elaboração própria.",
+    general_title = "",
+    footnote_as_chunk = TRUE,
+    escape = TRUE,
+    threeparttable = TRUE
+  )
+```
+
+### Modelo 2:
+
+Proposta de novo modelo e utilizando a função auto.arima:
+
+```{r, modelo2, echo=FALSE}
+##Proposta de novo modelo e utilizando a função auto.arima
+
+modelo2 <- auto.arima(y)
+summary(modelo2)
+coeftest(modelo2)
+###Componente MA e AR significativos. 
+```
+
+A função auto.arima retornou um modelo ARIMA(1,2,1) com componente MA e AR significativos.
+
+Abaixo, na FIGURA 12, o gráfico da série analisada e o modelo ajustado:
+
+```{r, model2-fitted, echo=FALSE}
+p <- autoplot(y, series = "Observado") + 
+  autolayer(fitted(modelo2), series = "ARIMA", linetype = "dashed") +
+  labs(
+    title = NULL,
+    caption = NULL,
+    x = "Ano", y = "Consumo de Energia"
+  ) +
+  scale_color_manual(values = c("Observado" = "black", "ARIMA" = "red")) +
+  theme_classic(base_size = 10) +
+  theme(
+    legend.title = element_blank(),
+    legend.position = "bottom",
+    plot.caption = element_text(hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 10)
+  )
+
+p + plot_annotation(
+  title = "Figura 12 - Série Observada vs. Ajuste ARIMA",
+  caption = "Fonte: Elaboração própria.",
+  theme = theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    plot.caption = element_text(hjust = 0.5, size = 10),
+    plot.margin = margin(1, 1, 1, 1, "cm")
+  )
+)
+```
+
+#### Resíduos Modelo 2:
+
+##### Autocorrelação:
+
+A FIGURA 12 abaixo mostra o gráfico de linha dos resíduos bem como os correlogramas.
+
+```{r, correlograms12, echo=FALSE}
+#Análise de resíduos
+
+# Gráficos
+p1 <- autoplot(residuals(modelo2)) + 
+  labs(title = NULL, caption = "Gráfico de resíduos", x = "Tempo") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+p2 <- ggAcf(residuals(modelo2), ci = 0.99) + 
+  labs(title = NULL, caption = "Autocorrelação (ACF) com IC 99%") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+p3 <- ggPacf(residuals(modelo2), ci = 0.99) + 
+  labs(title = NULL, caption = "Autocorrelação Parcial (PACF) com IC 99%") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+# Layout: p2 e p3 lado a lado em cima, p1 embaixo
+(p2 | p3) / p1 + 
+  plot_annotation(
+    title = "Figura 12 - Correlogramas e gráfico dos resíduos",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+      plot.caption = element_text(hjust = 0.5, size = 10),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    )
+  )
+```
+
+A seguir, foi realizada a análise de independência de resíduos (*Box.test*), sob as hipóteses:
+
+$$
+H0: \text{Não há autocorrelação dos resíduos} \\
+H1: \text{Os resíduos estão correlacionados.} 
+$$
+
+```{r, autocorrelation-model2, echo=FALSE}
+Box.test(residuals(modelo2), lag = 20, type = "Ljung-Box")
+##H0: Não existe correlação significativa entre os resíduos vs.
+##H1: Existe correlação significativa entre os resíduos.
+
+##Os resíduos não estão autocorrelacionados, pois não existem evidências
+##para rejeição de H0 (p-value = 0,12) e graficamente tambem não apresentou
+##nenhum indicativo de correlação. 
+
+```
+
+Os resíduos não estão autocorrelacionados, pois não existem evidências para rejeição da hipótese nula (*p-value* = 0,12) e graficamente também não apresentou nenhum indicativo de correlação.
+
+##### Normalidade
+
+Para avaliar a normalidade dos resíduos e conferir se eles se configuram como ruídos brancos gaussianos, foi realizado o teste de *Shapiro.Wilk*, sob as hipóteses:
+
+$$
+H0: \text{Os resíduos são normais} \\
+H1: \text{Os resíduos não apresentam normalidade.} 
+$$
+
+```{r, normality-test-model2, echo=FALSE}
+#Shapiro-Wilk normality test
+shapiro.test(residuals(modelo2))
+
+```
+
+Com *p-value* 1,13 x 10^-9^, a hipótese nula é rejeitada, concluindo que os resíduos não são normais, porém como não possuem autocorrelação, podem ser considerados ruídos brancos não-gaussianos. A FIGURA 13 abaixo mostra o histograma dos resíduos, em que é possível conferir a ausência de normalidade graficamente.
+
+```{r, histogram-residuals2, echo=FALSE}
+df_res2 <- data.frame(residuos2 = residuals(modelo2))
+
+p_hist2 <- ggplot(df_res2, aes(x = residuos2)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "lightblue", color = "black") +
+  labs(
+    title = NULL,
+    caption = NULL,
+    x = "Resíduos", y = "Densidade"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 10))
+
+p_hist2 + plot_annotation(
+  title = "Figura 13 - Normalidade de Resíduos",
+  caption = "Fonte: Elaboração própria.",
+  theme = theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    plot.caption = element_text(hjust = 0.5, size = 10),
+    plot.margin = margin(1, 1, 1, 1, "cm")
+  )
+)
+```
+
+A função *auto.arima* indicou um modelo com 1 componente regressora, 2 diferenciações e 1 componentede média móvel ARIMA(1,2,1)
+
+### Comparação entre os modelos criados pela função arima e autoarima.
+
+Pelo critério AIC, o modelo 1 = 984,919, enquanto o modelo2 = 945,52. Logo, o modelo 2 explica melhor o fenômeno.
+
+#### Visualização do modelo 2:
+
+Na FIGURA 14 abaixo, estão os gráficos do modelo 2, sendo a FIGURA 14a o gráfico de linhas do modelo, enquanto as FIGURAS 14b e 14c representam os correlogramas. É possível identificar uma série sem "crescimento" e primeiro lag significativo.
+
+```{r, model2-plot, echo=FALSE}
+## Visualização do modelo 2: 
+dif2_y=diff(y,lag=1,dif=2)
+
+# Gráfico de linha da série diferenciada
+p1 <- autoplot(dif2_y) +
+  labs(
+    title = NULL,
+    caption = "Figura 14a.",
+    x = "Tempo", y = "Valor"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 8))
+
+# ACF da série diferenciada
+p2 <- ggAcf(dif2_y) +
+  labs(
+    title = NULL,
+    caption = "Figura 14b",
+    x = "Lag"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 8))
+
+# PACF da série diferenciada
+p3 <- ggPacf(dif2_y) +
+  labs(
+    title = NULL,
+    caption = "Figura 14c.",
+    x = "Lag"
+  ) +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0.5, size = 8))
+
+# Combina os gráficos com título e legenda gerais
+(p1 / (p2 | p3)) +
+  plot_annotation(
+    title = "Figura 14 - Análise da Série Temporal Diferenciada",
+    caption = "Fonte: Elaboração própria.",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 10),
+      plot.caption = element_text(hjust = 0.5, size = 10),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    )
+  )
+
+```
+
+Abaixo na TABELA 2 as estatísticas descritivas do modelo 2.
+
+```{r, table2, echo=FALSE}
+
+library(knitr)
+library(kableExtra)
+
+# Estatísticas do modelo
+metricas_modelo <- round(rbind(
+  MSE = accuracy(modelo2)[2],
+  AIC = modelo2$aic,
+  BIC = modelo2$bic,    
+  AICc = modelo2$aicc     
+), 3)
+
+# Estatísticas dos resíduos
+estatisticas_residuos <- round(rbind(
+  Media = mean(residuals(modelo2)),
+  Sd = sd(residuals(modelo2)),
+  Skewness = skewness(residuals(modelo2)),
+  Kurtose = kurtosis(residuals(modelo2))
+), 3)
+
+# Unificando os dados em um único data frame
+tabela_avaliacao <- data.frame(
+  Estatística = rownames(metricas_modelo),
+  Modelo = metricas_modelo[,1],
+  row.names = NULL
+)
+
+tabela_residuos <- data.frame(
+  Estatística = rownames(estatisticas_residuos),
+  Modelo = estatisticas_residuos[,1],
+  row.names = NULL
+)
+
+tabela_residuos <- rbind(
+  tabela_residuos,
+  data.frame(Estatística = "p_valor_Shap", Modelo = "1.139e-09")
+)
+
+# Junta tudo
+tabela_final <- rbind(tabela_avaliacao, tabela_residuos)
+
+# Geração da tabela formatada em LaTeX
+kable(tabela_final,
+      caption = "Tabela 2 - Métricas do modelo e estatísticas dos resíduos.",
+      align = 'c',
+      format = "latex",
+      booktabs = TRUE) %>%
+  kable_styling(
+    latex_options = c("hold_position", "striped"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE) %>%
+  footnote(
+    general = "Fonte: Elaboração própria.",
+    general_title = "",
+    footnote_as_chunk = TRUE,
+    escape = TRUE,
+    threeparttable = TRUE
+  )
+```
